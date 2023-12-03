@@ -8,23 +8,46 @@
 
 /* Begin PBXBuildFile section */
 		8CAE79292B1CF8A50087C35E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAE79282B1CF8A50087C35E /* main.cpp */; };
+		8CAE79352B1CFAD90087C35E /* libvulkan.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CAE79332B1CFAD90087C35E /* libvulkan.1.dylib */; };
+		8CAE79372B1CFB040087C35E /* libvulkan.1.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8CAE79332B1CFAD90087C35E /* libvulkan.1.dylib */; };
+		8CAE79432B1D1FBB0087C35E /* libvulkan.1.3.268.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CAE79322B1CFAD90087C35E /* libvulkan.1.3.268.dylib */; };
+		8CAE79442B1D1FBF0087C35E /* libvulkan.1.3.268.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8CAE79322B1CFAD90087C35E /* libvulkan.1.3.268.dylib */; };
+		8CAE79452B1D200F0087C35E /* libglfw.3.3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CAE79302B1CFAA80087C35E /* libglfw.3.3.dylib */; };
+		8CAE79462B1D20170087C35E /* libglfw.3.3.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8CAE79302B1CFAA80087C35E /* libglfw.3.3.dylib */; };
+		8CAE794D2B1D25EE0087C35E /* triangle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAE794B2B1D25EE0087C35E /* triangle.cpp */; };
+		8CAE79532B1D2A7C0087C35E /* compute.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAE79512B1D2A7C0087C35E /* compute.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		8CAE79232B1CF8A50087C35E /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
+			buildActionMask = 12;
+			dstPath = "";
+			dstSubfolderSpec = 10;
 			files = (
+				8CAE79462B1D20170087C35E /* libglfw.3.3.dylib in CopyFiles */,
+				8CAE79442B1D1FBF0087C35E /* libvulkan.1.3.268.dylib in CopyFiles */,
+				8CAE79372B1CFB040087C35E /* libvulkan.1.dylib in CopyFiles */,
 			);
-			runOnlyForDeploymentPostprocessing = 1;
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		8CAE79252B1CF8A50087C35E /* n-body-cpp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "n-body-cpp"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAE79282B1CF8A50087C35E /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		8CAE79302B1CFAA80087C35E /* libglfw.3.3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libglfw.3.3.dylib; path = ../../../../../../../opt/homebrew/Cellar/glfw/3.3.8/lib/libglfw.3.3.dylib; sourceTree = "<group>"; };
+		8CAE79322B1CFAD90087C35E /* libvulkan.1.3.268.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libvulkan.1.3.268.dylib; path = ../../../../../VulkanSDK/1.3.268.1/macOS/lib/libvulkan.1.3.268.dylib; sourceTree = "<group>"; };
+		8CAE79332B1CFAD90087C35E /* libvulkan.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libvulkan.1.dylib; path = ../../../../../VulkanSDK/1.3.268.1/macOS/lib/libvulkan.1.dylib; sourceTree = "<group>"; };
+		8CAE79392B1CFBEB0087C35E /* libglfw.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libglfw.dylib; path = ../../../../../../../opt/homebrew/Cellar/glfw/3.3.8/lib/libglfw.dylib; sourceTree = "<group>"; };
+		8CAE793E2B1CFD1C0087C35E /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		8CAE79412B1CFD680087C35E /* glfw3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = glfw3.h; path = ../../../../../../../opt/homebrew/Cellar/glfw/3.3.8/include/GLFW/glfw3.h; sourceTree = "<group>"; };
+		8CAE794B2B1D25EE0087C35E /* triangle.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = triangle.cpp; sourceTree = "<group>"; };
+		8CAE794C2B1D25EE0087C35E /* triangle.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = triangle.hpp; sourceTree = "<group>"; };
+		8CAE79512B1D2A7C0087C35E /* compute.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = compute.cpp; sourceTree = "<group>"; };
+		8CAE79522B1D2A7C0087C35E /* compute.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = compute.hpp; sourceTree = "<group>"; };
+		8CAE79542B1D2EF60087C35E /* shader.comp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = shader.comp; sourceTree = "<group>"; };
+		8CAE79552B1D30A60087C35E /* shader.spv */ = {isa = PBXFileReference; lastKnownFileType = file; path = shader.spv; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +55,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8CAE79432B1D1FBB0087C35E /* libvulkan.1.3.268.dylib in Frameworks */,
+				8CAE79352B1CFAD90087C35E /* libvulkan.1.dylib in Frameworks */,
+				8CAE79452B1D200F0087C35E /* libglfw.3.3.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -43,6 +69,7 @@
 			children = (
 				8CAE79272B1CF8A50087C35E /* n-body-cpp */,
 				8CAE79262B1CF8A50087C35E /* Products */,
+				8CAE792F2B1CFAA80087C35E /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,9 +84,36 @@
 		8CAE79272B1CF8A50087C35E /* n-body-cpp */ = {
 			isa = PBXGroup;
 			children = (
+				8CAE794F2B1D27B60087C35E /* shaders */,
 				8CAE79282B1CF8A50087C35E /* main.cpp */,
+				8CAE794B2B1D25EE0087C35E /* triangle.cpp */,
+				8CAE794C2B1D25EE0087C35E /* triangle.hpp */,
+				8CAE79512B1D2A7C0087C35E /* compute.cpp */,
+				8CAE79522B1D2A7C0087C35E /* compute.hpp */,
 			);
 			path = "n-body-cpp";
+			sourceTree = "<group>";
+		};
+		8CAE792F2B1CFAA80087C35E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8CAE79412B1CFD680087C35E /* glfw3.h */,
+				8CAE793E2B1CFD1C0087C35E /* OpenGL.framework */,
+				8CAE79392B1CFBEB0087C35E /* libglfw.dylib */,
+				8CAE79322B1CFAD90087C35E /* libvulkan.1.3.268.dylib */,
+				8CAE79332B1CFAD90087C35E /* libvulkan.1.dylib */,
+				8CAE79302B1CFAA80087C35E /* libglfw.3.3.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8CAE794F2B1D27B60087C35E /* shaders */ = {
+			isa = PBXGroup;
+			children = (
+				8CAE79552B1D30A60087C35E /* shader.spv */,
+				8CAE79542B1D2EF60087C35E /* shader.comp */,
+			);
+			path = shaders;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -119,7 +173,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8CAE79532B1D2A7C0087C35E /* compute.cpp in Sources */,
 				8CAE79292B1CF8A50087C35E /* main.cpp in Sources */,
+				8CAE794D2B1D25EE0087C35E /* triangle.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,6 +301,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				HEADER_SEARCH_PATHS = (
+					/Users/jacobmacweb/VulkanSDK/1.3.268.1/macOS/include,
+					/usr/local/include,
+					/opt/homebrew/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					/Users/jacobmacweb/VulkanSDK/1.3.268.1/macOS/lib,
+					/usr/local/lib,
+					/opt/homebrew/Cellar/glfw/3.3.8/lib,
+					/opt/homebrew/lib,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -253,6 +320,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				HEADER_SEARCH_PATHS = (
+					/Users/jacobmacweb/VulkanSDK/1.3.268.1/macOS/include,
+					/usr/local/include,
+					/opt/homebrew/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					/Users/jacobmacweb/VulkanSDK/1.3.268.1/macOS/lib,
+					/usr/local/lib,
+					/opt/homebrew/Cellar/glfw/3.3.8/lib,
+					/opt/homebrew/lib,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

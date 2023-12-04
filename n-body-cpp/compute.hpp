@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "vulkan/vulkan.h"
+#include <array>
 
 class ComputeShaderInterface {
 public:
@@ -19,6 +20,8 @@ public:
     uint8_t setupShaderModule();
     uint8_t setupComputePipeline();
     void setDescriptorLayout();
+    void setupDescriptorPool();
+    void allocateDescriptorSets();
     uint8_t setupCommandPool();
     uint8_t setupCommandBuffer();
 private:
@@ -26,6 +29,10 @@ private:
     VkDevice device;
     VkShaderModule shaderModule;
     VkPipeline computePipeline;
+    VkDescriptorSet descriptorSet;
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
     VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
 };

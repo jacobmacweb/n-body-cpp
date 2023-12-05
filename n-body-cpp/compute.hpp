@@ -20,6 +20,14 @@ struct Particle {
     float mass;
 };
 
+struct InputData {
+    std::array<Particle, MAX_PARTICLE_COUNT> input_data;
+};
+
+struct OutputData {
+    std::array<Particle, MAX_PARTICLE_COUNT> next;
+};
+
 struct UniformBlock {
     float u_dt;
     
@@ -69,6 +77,7 @@ public:
     
     // This is described in the order of execution.
     uint8_t setupVulkan();
+    void setupPhysicalDevice();
     uint8_t setupDevice();
     uint32_t setupQueueFamilyIndex();
     uint8_t setupQueue();
@@ -87,13 +96,13 @@ public:
     
     void allocateDescriptorSets();
     
-    void mapMemory();
+    void mapMemory(void** output);
     
     // Data phase
     void copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt);
     void dispatchShader();
     
-    void retrieveResult(void* data);
+    void retrieveResult(void** data);
     void retrieveResultCleanup();
     
     // Clean-up

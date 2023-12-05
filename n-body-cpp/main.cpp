@@ -27,10 +27,12 @@ int main() {
     
     csi.setup();
     std::array<Particle, MAX_PARTICLE_COUNT> particles;
+    void *output;
+    csi.mapMemory(&output);
     csi.copyToBuffer(particles, 0.1);
     csi.dispatchShader();
     void *data;
-    csi.retrieveResult(data);
+    csi.retrieveResult(&data);
     csi.retrieveResultCleanup();
     
 

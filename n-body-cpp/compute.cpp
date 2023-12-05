@@ -22,12 +22,14 @@ uint8_t ComputeShaderInterface::setup() {
         return EXIT_FAILURE;
     }
     
+    setupPhysicalDevice();
+    setupQueueFamilyIndex();
+    
     std::cout << "Setting up Device" << std::endl;
     if (setupDevice() != EXIT_SUCCESS) {
         return EXIT_FAILURE;
     }
     
-    setupQueueFamilyIndex();
     
     std::cout << "Setting up Queue" << std::endl;
     if (setupQueue() != EXIT_SUCCESS) {
@@ -55,9 +57,6 @@ uint8_t ComputeShaderInterface::setup() {
     
     std::cout << "Creating buffers" << std::endl;
     createAllBuffers();
-    
-    std::cout << "Mapping memory" << std::endl;
-    mapMemory();
     
     std::cout << "Re-allocating descriptor sets" << std::endl;
     allocateDescriptorSets();
@@ -120,7 +119,7 @@ uint8_t ComputeShaderInterface::setupVulkan() {
     return EXIT_SUCCESS;
 }
 
-uint8_t ComputeShaderInterface::setupDevice() {
+void ComputeShaderInterface::setupPhysicalDevice() {
     physicalDevice = VK_NULL_HANDLE;
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
@@ -132,7 +131,9 @@ uint8_t ComputeShaderInterface::setupDevice() {
 
     // Here, just pick the first device. In a real application, you would choose based on properties and features.
     physicalDevice = devices[0];
-    
+}
+
+uint8_t ComputeShaderInterface::setupDevice() {
     VkDeviceQueueCreateInfo queueCreateInfo{};
     float queuePriority = 1.0f;
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -341,20 +342,20 @@ void ComputeShaderInterface::createUniformBuffer() {
 }
 
 void ComputeShaderInterface::createInputBuffer() {
-    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, inputBuffer, inputBufferMemory);
+    genericCreateBuffer(device, physicalDevice, sizeof(InputData), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, inputBuffer, inputBufferMemory);
     
     inputBufferInfo.buffer = inputBuffer; // Your input data VkBuffer
     inputBufferInfo.offset = 0; // Start from the beginning of the buffer
-    inputBufferInfo.range = sizeof(Particle) * MAX_PARTICLE_COUNT; // Size of the input data
+    inputBufferInfo.range = sizeof(InputData); // Size of the input data
 
 }
 
 void ComputeShaderInterface::createOutputBuffer() {
-    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, outputBuffer, outputBufferMemory);
+    genericCreateBuffer(device, physicalDevice, sizeof(OutputData), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, outputBuffer, outputBufferMemory);
     
     outputBufferInfo.buffer = outputBuffer; // Your output data VkBuffer
     outputBufferInfo.offset = 0; // Start from the beginning of the buffer
-    outputBufferInfo.range = sizeof(Particle) * MAX_PARTICLE_COUNT; // Size of the output data
+    outputBufferInfo.range = sizeof(OutputData); // Size of the output data
 
     
 }
@@ -404,13 +405,18 @@ void ComputeShaderInterface::allocateDescriptorSets() {
 
 }
 
-void ComputeShaderInterface::mapMemory() {
-    vkMapMemory(device, inputBufferMemory, 0, sizeof(Particle) * MAX_PARTICLE_COUNT, 0, &inputData);
+void ComputeShaderInterface::mapMemory(void** output) {
+    vkMapMemory(device, inputBufferMemory, 0, sizeof(InputData), 0, &inputData);
+    vkMapMemory(device, outputBufferMemory, 0, sizeof(OutputData), 0, output);
     vkMapMemory(device, uniformBufferMemory, 0, sizeof(UniformBlock), 0, &uniformData);
 }
 
 void ComputeShaderInterface::copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt) {
-    memcpy(inputData, particles.data(), (size_t)sizeof(Particle) * MAX_PARTICLE_COUNT);
+    InputData ip = {
+        .input_data = particles
+    };
+    
+    memcpy(inputData, &ip, (size_t)sizeof(InputData));
 
     // Similarly for the uniform buffer
     UniformBlock ubo = {
@@ -432,6 +438,8 @@ void ComputeShaderInterface::dispatchShader() {
     }
 
     VkCommandBuffer commandBuffer;
+    
+    // Barrier
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool;
@@ -456,13 +464,13 @@ void ComputeShaderInterface::dispatchShader() {
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
-
+    
     vkQueueSubmit(computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(computeQueue);
 }
 
-void ComputeShaderInterface::retrieveResult(void* data) {
-    vkMapMemory(device, outputBufferMemory, 0, sizeof(Particle) * MAX_PARTICLE_COUNT, 0, &data);
+void ComputeShaderInterface::retrieveResult(void** data) {
+    vkMapMemory(device, outputBufferMemory, 0, sizeof(OutputData), 0, data);
 }
 
 void ComputeShaderInterface::retrieveResultCleanup() {

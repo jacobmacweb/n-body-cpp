@@ -67,6 +67,7 @@
 		8CAE791C2B1CF8A40087C35E = {
 			isa = PBXGroup;
 			children = (
+				8CAE794F2B1D27B60087C35E /* shaders */,
 				8CAE79272B1CF8A50087C35E /* n-body-cpp */,
 				8CAE79262B1CF8A50087C35E /* Products */,
 				8CAE792F2B1CFAA80087C35E /* Frameworks */,
@@ -84,7 +85,6 @@
 		8CAE79272B1CF8A50087C35E /* n-body-cpp */ = {
 			isa = PBXGroup;
 			children = (
-				8CAE794F2B1D27B60087C35E /* shaders */,
 				8CAE79282B1CF8A50087C35E /* main.cpp */,
 				8CAE794B2B1D25EE0087C35E /* triangle.cpp */,
 				8CAE794C2B1D25EE0087C35E /* triangle.hpp */,

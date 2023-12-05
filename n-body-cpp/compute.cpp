@@ -6,19 +6,57 @@
 //
 
 #include "compute.hpp"
+#include <GLFW/glfw3.h>
+#include <filesystem>
 #include <iostream>
+#include <fstream>
 #include "vulkan/vulkan.h"
+//
+//const char *shader =
+//#include "../shaders/shader.spv"
+//;
 
-const char *shader =
-#include "./shaders/shader.spv"
-
-
-void ComputeShaderInterface::cleanup() {
-    vkDestroyPipeline(device, computePipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyShaderModule(device, computeShaderModule, nullptr);
+uint8_t ComputeShaderInterface::setup() {
+    std::cout << "Setting up Vulkan" << std::endl;
+    if (setupVulkan() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Setting up Device" << std::endl;
+    if (setupDevice() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Setting up Queue" << std::endl;
+    if (setupQueue() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Setting up Shader" << std::endl;
+    if (loadShader() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Setting up Compute Pipeline" << std::endl;
+    if (setupComputePipeline() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Setting up Descriptor Sets" << std::endl;
+    if (createDescriptorSet() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Setting up Descriptor Pool" << std::endl;
+    if (createDescriptorPool() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    std::cout << "Creating buffers" << std::endl;
+    createAllBuffers();
+    
+    return EXIT_SUCCESS;
 }
-
 
 uint8_t ComputeShaderInterface::setupVulkan() {
     // Setup app info
@@ -33,20 +71,42 @@ uint8_t ComputeShaderInterface::setupVulkan() {
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
+    
+//    createInfo.enabledExtensionCount = 0;
+//    createInfo.ppEnabledExtensionNames = nullptr;
+    // Mac compatibility
+    
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions;
 
-    // If you want to enable extensions (like for window surface), add them here
-    createInfo.enabledExtensionCount = 0;
-    createInfo.ppEnabledExtensionNames = nullptr;
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    
+    std::vector<const char*> requiredExtensions;
+
+    // Use built-ins
+    for(uint32_t i = 0; i < glfwExtensionCount; i++) {
+        requiredExtensions.emplace_back(glfwExtensions[i]);
+    }
+
+    // Use extra extensions
+    requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+
+    createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+
+    // Enable extensions
+    createInfo.enabledExtensionCount = (uint32_t) requiredExtensions.size();
+    createInfo.ppEnabledExtensionNames = requiredExtensions.data();
+
 
     // If using validation layers, set them up here
     createInfo.enabledLayerCount = 0;
     createInfo.ppEnabledLayerNames = nullptr;
     
     // Create instance
-    VkInstance instance;
-    if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+    auto result = vkCreateInstance(&createInfo, nullptr, &instance);
+    if (result != VK_SUCCESS) {
         // Handle errors
-        std::cerr << "Failed to create Vulkan instance" << std::endl;
+        std::cerr << "Failed to create Vulkan instance: " << result << std::endl;
         return EXIT_FAILURE;
     }
     
@@ -54,25 +114,82 @@ uint8_t ComputeShaderInterface::setupVulkan() {
 }
 
 uint8_t ComputeShaderInterface::setupDevice() {
-    VkDeviceCreateInfo deviceCreateInfo = {};
-    // Fill in the deviceCreateInfo structure
-    // This includes specifying desired features, queue families, etc.
-
-    VkPhysicalDevice physicalDevice; // This should have been selected earlier
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
-        // Handle error
+    physicalDevice = VK_NULL_HANDLE;
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+    if (deviceCount == 0) {
+        throw std::runtime_error("failed to find GPUs with Vulkan support!");
     }
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+    // Here, just pick the first device. In a real application, you would choose based on properties and features.
+    physicalDevice = devices[0];
+    
+    VkDeviceQueueCreateInfo queueCreateInfo{};
+    float queuePriority = 1.0f;
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = 0; // In a real application, find the correct queue family for compute operations
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = &queuePriority;
+
+    VkDeviceCreateInfo deviceCreateInfo{};
+    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceCreateInfo.queueCreateInfoCount = 1;
+
+    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
+        std::cerr <<  "failed to create logical device!" << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    return EXIT_SUCCESS;
 }
 
-uint8_t ComputeShaderInterface::setupShaderModule() {
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = computeShaderCode.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(computeShaderCode.data());
+uint8_t ComputeShaderInterface::setupQueue() {
+    vkGetDeviceQueue(device, 0, 0, &computeQueue);
+    
+    return EXIT_SUCCESS;
+}
 
-    if (vkCreateShaderModule(device, &createInfo, nullptr, &computeShaderModule) != VK_SUCCESS) {
-        // Handle errors
-        std::cerr << "Failed to create shader module!" << std::endl;
+// See: https://stackoverflow.com/a/38559209
+std::vector<char> ComputeShaderInterface::getShaderFromFile() {
+    std::vector<char> vec;
+    std::ifstream file;
+    file.exceptions(
+        std::ifstream::badbit
+      | std::ifstream::failbit
+      | std::ifstream::eofbit);
+    
+    //Need to use binary mode; otherwise CRLF line endings count as 2 for
+    //`length` calculation but only 1 for `file.read` (on some platforms),
+    //and we get undefined  behaviour when trying to read `length` characters.
+    
+    std::filesystem::path cwd = std::filesystem::current_path();
+    
+    // TODO : Make this inline or something...
+    file.open("/Users/jacobmacweb/Documents/Projects/_personal/xcode/n-body-cpp/shaders/shader.spv", std::ifstream::in | std::ifstream::binary);
+    file.seekg(0, std::ios::end);
+    std::streampos length(file.tellg());
+    if (length) {
+        file.seekg(0, std::ios::beg);
+        vec.resize(static_cast<std::size_t>(length));
+        file.read(&vec.front(), static_cast<std::size_t>(length));
+    }
+    
+    return vec;
+}
+
+uint8_t ComputeShaderInterface::loadShader() {
+    std::vector<char> shaderCode = getShaderFromFile();
+    
+    VkShaderModuleCreateInfo shaderModuleCreateInfo{};
+    shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shaderModuleCreateInfo.codeSize = shaderCode.size();
+    shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
+    
+    if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+        std::cerr <<  "failed to create shader module!" << std::endl;
         return EXIT_FAILURE;
     }
     
@@ -80,146 +197,247 @@ uint8_t ComputeShaderInterface::setupShaderModule() {
 }
 
 uint8_t ComputeShaderInterface::setupComputePipeline() {
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    // Add descriptors layout, push constants here if needed
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pSetLayouts = nullptr;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-    pipelineLayoutInfo.pPushConstantRanges = nullptr;
-
-    VkPipelineLayout pipelineLayout;
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-        std::cerr << "Failed to create pipeline layout!" << std::endl;
+        std::cerr <<  "failed to create pipeline layout!" << std::endl;
         return EXIT_FAILURE;
     }
-    
-    VkComputePipelineCreateInfo pipelineCreateInfo = {};
+
+    VkComputePipelineCreateInfo pipelineCreateInfo{};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     pipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    pipelineCreateInfo.stage.module = computeShaderModule;
-    pipelineCreateInfo.stage.pName = "main"; // Entry point of the shader
+    pipelineCreateInfo.stage.module = shaderModule;
+    pipelineCreateInfo.stage.pName = "main";
     pipelineCreateInfo.layout = pipelineLayout;
 
-    VkPipeline computePipeline;
     if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &computePipeline) != VK_SUCCESS) {
-        std::cerr << "Failed to create compute pipeline!" << std::endl;
+        std::cerr <<  "failed to create compute pipeline!" << std::endl;
         return EXIT_FAILURE;
     }
     
     return EXIT_SUCCESS;
 }
 
-void ComputeShaderInterface::setDescriptorLayout() {
-    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+// Descriptor set
+uint8_t ComputeShaderInterface::createDescriptorSet() {
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboLayoutBinding.descriptorCount = 1;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
-    VkDescriptorSetLayoutBinding inputBufferBinding = {};
-    inputBufferBinding.binding = 2;
-    inputBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    inputBufferBinding.descriptorCount = 1;
-    inputBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    inputBufferBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding inputLayoutBinding{};
+    inputLayoutBinding.binding = 1;
+    inputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    inputLayoutBinding.descriptorCount = 1;
+    inputLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    inputLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
-    VkDescriptorSetLayoutBinding outputBufferBinding = {};
-    outputBufferBinding.binding = 1;
-    outputBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    outputBufferBinding.descriptorCount = 1;
-    outputBufferBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    outputBufferBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding outputLayoutBinding{};
+    outputLayoutBinding.binding = 2;
+    outputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    outputLayoutBinding.descriptorCount = 1;
+    outputLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    outputLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, outputBufferBinding, inputBufferBinding};
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, inputLayoutBinding, outputLayoutBinding};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     layoutInfo.pBindings = bindings.data();
 
-    vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout);
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        std::cerr << "failed to create descriptor set layout!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+    // You'll also need to create a descriptor pool and allocate descriptor sets from it, then update the sets with the buffers
 }
 
-void ComputeShaderInterface::setupDescriptorPool() {
+uint8_t ComputeShaderInterface::createDescriptorPool() {
+    VkDescriptorPool descriptorPool;
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1;
+
+//    VkDescriptorPoolCreateInfo poolInfo{};
+//    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+//    poolInfo.poolSizeCount = 1;
+//    poolInfo.pPoolSizes = &poolSize;
+//    poolInfo.maxSets = 1;
+    
+    // This sizes the descriptor pool to match the demands of the descriptor sets
     VkDescriptorPoolSize poolSizes[] = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 }
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 }  // Two storage buffers
     };
 
-    VkDescriptorPoolCreateInfo poolInfo = {};
+    VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 2;
+    poolInfo.poolSizeCount = sizeof(poolSizes) / sizeof(poolSizes[0]);
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = 1;
+    poolInfo.maxSets = 1;  // Number of descriptor sets
 
-    vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool);
-}
+    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor pool!");
+    }
 
-void ComputeShaderInterface::allocateDescriptorSets() {
-    VkDescriptorSetAllocateInfo allocInfo = {};
+    VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &descriptorSetLayout;
 
-    vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
+    auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
+    if (result != VK_SUCCESS) {
+        std::cerr << "failed to allocate descriptor set: " << result << std::endl;
+        return EXIT_FAILURE;
+    }
 
-    VkDescriptorBufferInfo uboBufferInfo = {/* ubo buffer info */};
-    VkDescriptorBufferInfo inputBufferInfo = {/* input buffer info */};
-    VkDescriptorBufferInfo outputBufferInfo = {/* output buffer info */};
-
-    descriptorWrites = {};
-
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSet;
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &uboBufferInfo;
-
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptorSet;
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pBufferInfo = &outputBufferInfo;
-
-    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[2].dstSet = descriptorSet;
-    descriptorWrites[2].dstBinding = 2;
-    descriptorWrites[2].dstArrayElement = 0;
-    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptorWrites[2].descriptorCount = 1;
-    descriptorWrites[2].pBufferInfo = &inputBufferInfo;
-
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-
-}
-
-uint8_t ComputeShaderInterface::setupCommandPool() {
-    VkCommandPoolCreateInfo poolCreateInfo = {};
-    poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolCreateInfo.queueFamilyIndex = /* index of a queue family that supports compute operations */;
-    poolCreateInfo.flags = 0; // Optional
-
-    vkCreateCommandPool(device, &poolCreateInfo, nullptr, &commandPool);
-    
+    // Update descriptor sets with the uniform, input, and output buffers
     return EXIT_SUCCESS;
-
 }
 
-uint8_t ComputeShaderInterface::setupCommandBuffer() {
-    VkCommandBufferAllocateInfo allocInfo = {};
+
+// Buffers
+void ComputeShaderInterface::createUniformBuffer() {
+    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, inputBuffer, inputBufferMemory);
+    
+}
+
+void ComputeShaderInterface::createInputBuffer() {
+    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, outputBuffer, outputBufferMemory);
+    
+}
+
+void ComputeShaderInterface::createOutputBuffer() {
+    genericCreateBuffer(device, physicalDevice, sizeof(UniformBlock), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
+}
+
+void ComputeShaderInterface::createAllBuffers() {
+    createUniformBuffer();
+    createInputBuffer();
+    createOutputBuffer();
+}
+
+void ComputeShaderInterface::copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt) {
+    void* data;
+    vkMapMemory(device, inputBufferMemory, 0, sizeof(Particle) * MAX_PARTICLE_COUNT, 0, &data);
+    memcpy(data, particles.data(), (size_t)sizeof(Particle) * MAX_PARTICLE_COUNT);
+    vkUnmapMemory(device, inputBufferMemory);
+
+    // Similarly for the uniform buffer
+    UniformBlock ubo = {
+        .u_particle_count = MAX_PARTICLE_COUNT,
+        .u_dt =  dt
+    };
+    
+    vkMapMemory(device, uniformBufferMemory, 0, sizeof(UniformBlock), 0, &data);
+    memcpy(data, &ubo, sizeof(UniformBlock));
+    vkUnmapMemory(device, uniformBufferMemory);
+}
+
+void ComputeShaderInterface::dispatchShader() {
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex = 0; // Use the correct queue family index
+    poolInfo.flags = 0; // Optional
+
+    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create command pool!");
+    }
+
+    VkCommandBuffer commandBuffer;
+    VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 
-    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
-    
-    return EXIT_SUCCESS;
+    if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate command buffers!");
+    }
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    vkCmdDispatch(commandBuffer, 1, 1, 1);
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(computeQueue);
+}
+
+void ComputeShaderInterface::retrieveResult(void* data) {
+    vkMapMemory(device, outputBufferMemory, 0, sizeof(Particle) * MAX_PARTICLE_COUNT, 0, &data);
+}
+
+void ComputeShaderInterface::retrieveResultCleanup() {
+    vkUnmapMemory(device, outputBufferMemory);
+}
+
+void ComputeShaderInterface::genericCreateBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
+    std::cout << "memtypeindex: " << allocInfo.memoryTypeIndex << std::endl;
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate buffer memory!");
+    }
+
+    auto result = vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    if (result != VK_SUCCESS) {
+        std::cerr << "Failed to bind memory : " << result << std::endl;
+    }
+}
+
+uint32_t ComputeShaderInterface::findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+void ComputeShaderInterface::cleanup() {
+    vkDestroyShaderModule(device, shaderModule, nullptr);
+    vkDestroyPipeline(device, computePipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    // Destroy buffers, free memory, etc.
+    vkDestroyCommandPool(device, commandPool, nullptr);
+    vkDestroyDevice(device, nullptr);
+    vkDestroyInstance(instance, nullptr);
 }

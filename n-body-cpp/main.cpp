@@ -8,7 +8,7 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
-#include "compute.h"
+#include "compute.hpp"
 #include <iostream>
 
 int main() {
@@ -16,15 +16,20 @@ int main() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
-
+    
+    ComputeShaderInterface csi;
+    
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
     std::cout << extensionCount << " extensions supported\n";
-
-    glm::mat4 matrix;
-    glm::vec4 vec;
-    auto test = matrix * vec;
+    
+    
+    csi.setup();
+    std::array<Particle, MAX_PARTICLE_COUNT> particles;
+    csi.copyToBuffer(particles, 0.1);
+    csi.dispatchShader();
+    
 
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();

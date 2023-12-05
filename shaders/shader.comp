@@ -17,8 +17,6 @@ layout(std140, binding = 0) uniform UniformBlock {
     float u_dt;
 } ubo;
 
-const float GRAVITY = 0.000000000066742;
-
 layout(binding = 1) buffer OutputData
 {
     Particle next[];
@@ -28,6 +26,8 @@ layout(binding = 2) buffer InputData
 {
     Particle input_data[];
 };
+
+const float GRAVITY = 0.000000000066742;
 
 void main() {
     uint index = gl_GlobalInvocationID.x;

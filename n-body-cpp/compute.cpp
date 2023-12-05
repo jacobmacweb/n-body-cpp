@@ -56,6 +56,9 @@ uint8_t ComputeShaderInterface::setup() {
     std::cout << "Creating buffers" << std::endl;
     createAllBuffers();
     
+    std::cout << "Mapping memory" << std::endl;
+    mapMemory();
+    
     std::cout << "Re-allocating descriptor sets" << std::endl;
     allocateDescriptorSets();
     
@@ -133,7 +136,7 @@ uint8_t ComputeShaderInterface::setupDevice() {
     VkDeviceQueueCreateInfo queueCreateInfo{};
     float queuePriority = 1.0f;
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = 0; // In a real application, find the correct queue family for compute operations
+    queueCreateInfo.queueFamilyIndex = computeQueueFamilyIndex;
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
 
@@ -171,7 +174,7 @@ uint32_t ComputeShaderInterface::setupQueueFamilyIndex() {
 }
 
 uint8_t ComputeShaderInterface::setupQueue() {
-    vkGetDeviceQueue(device, 0, 0, &computeQueue);
+    vkGetDeviceQueue(device, computeQueueFamilyIndex, 0, &computeQueue);
     
     return EXIT_SUCCESS;
 }
@@ -401,11 +404,13 @@ void ComputeShaderInterface::allocateDescriptorSets() {
 
 }
 
+void ComputeShaderInterface::mapMemory() {
+    vkMapMemory(device, inputBufferMemory, 0, sizeof(Particle) * MAX_PARTICLE_COUNT, 0, &inputData);
+    vkMapMemory(device, uniformBufferMemory, 0, sizeof(UniformBlock), 0, &uniformData);
+}
+
 void ComputeShaderInterface::copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt) {
-    void* data;
-    vkMapMemory(device, inputBufferMemory, 0, sizeof(Particle) * MAX_PARTICLE_COUNT, 0, &data);
-    memcpy(data, particles.data(), (size_t)sizeof(Particle) * MAX_PARTICLE_COUNT);
-    vkUnmapMemory(device, inputBufferMemory);
+    memcpy(inputData, particles.data(), (size_t)sizeof(Particle) * MAX_PARTICLE_COUNT);
 
     // Similarly for the uniform buffer
     UniformBlock ubo = {
@@ -413,15 +418,13 @@ void ComputeShaderInterface::copyToBuffer(std::array<Particle, MAX_PARTICLE_COUN
         .u_dt =  dt
     };
     
-    vkMapMemory(device, uniformBufferMemory, 0, sizeof(UniformBlock), 0, &data);
-    memcpy(data, &ubo, sizeof(UniformBlock));
-    vkUnmapMemory(device, uniformBufferMemory);
+    memcpy(uniformData, &ubo, sizeof(UniformBlock));
 }
 
 void ComputeShaderInterface::dispatchShader() {
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = 0; // Use the correct queue family index
+    poolInfo.queueFamilyIndex = computeQueueFamilyIndex; // Use the correct queue family index
     poolInfo.flags = 0; // Optional
 
     if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
@@ -516,6 +519,8 @@ void ComputeShaderInterface::cleanup() {
     vkDestroyPipeline(device, computePipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     // Destroy buffers, free memory, etc.
+    vkUnmapMemory(device, inputBufferMemory);
+    vkUnmapMemory(device, uniformBufferMemory);
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDestroyDevice(device, nullptr);
     vkDestroyInstance(instance, nullptr);

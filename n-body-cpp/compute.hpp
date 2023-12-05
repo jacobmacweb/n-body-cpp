@@ -47,6 +47,10 @@ class ComputeShaderInterface {
     VkBuffer outputBuffer;
     VkDeviceMemory outputBufferMemory;
     
+    // mappings
+    void* inputData;
+    void* uniformData;
+    
     // desciptor set
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorSet descriptorSet;
@@ -82,6 +86,8 @@ public:
     void createAllBuffers();
     
     void allocateDescriptorSets();
+    
+    void mapMemory();
     
     // Data phase
     void copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt);

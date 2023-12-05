@@ -29,6 +29,9 @@ int main() {
     std::array<Particle, MAX_PARTICLE_COUNT> particles;
     csi.copyToBuffer(particles, 0.1);
     csi.dispatchShader();
+    void *data;
+    csi.retrieveResult(data);
+    csi.retrieveResultCleanup();
     
 
     while(!glfwWindowShouldClose(window)) {

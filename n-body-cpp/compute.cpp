@@ -27,6 +27,8 @@ uint8_t ComputeShaderInterface::setup() {
         return EXIT_FAILURE;
     }
     
+    setupQueueFamilyIndex();
+    
     std::cout << "Setting up Queue" << std::endl;
     if (setupQueue() != EXIT_SUCCESS) {
         return EXIT_FAILURE;
@@ -46,7 +48,6 @@ uint8_t ComputeShaderInterface::setup() {
     if (createDescriptorSet() != EXIT_SUCCESS) {
         return EXIT_FAILURE;
     }
-    
     std::cout << "Setting up Descriptor Pool" << std::endl;
     if (createDescriptorPool() != EXIT_SUCCESS) {
         return EXIT_FAILURE;
@@ -54,6 +55,9 @@ uint8_t ComputeShaderInterface::setup() {
     
     std::cout << "Creating buffers" << std::endl;
     createAllBuffers();
+    
+    std::cout << "Re-allocating descriptor sets" << std::endl;
+    allocateDescriptorSets();
     
     return EXIT_SUCCESS;
 }
@@ -146,6 +150,26 @@ uint8_t ComputeShaderInterface::setupDevice() {
     return EXIT_SUCCESS;
 }
 
+uint32_t ComputeShaderInterface::setupQueueFamilyIndex() {
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    for (uint32_t i = 0; i < queueFamilyCount; i++) {
+        if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            std::cout << "Found queue family: " << i << std::endl;
+            computeQueueFamilyIndex = i;
+            break;
+        }
+    }
+    if (computeQueueFamilyIndex == -1) {
+        throw std::runtime_error("failed to find a queue family that supports compute operations");
+    }
+    
+    return computeQueueFamilyIndex;
+}
+
 uint8_t ComputeShaderInterface::setupQueue() {
     vkGetDeviceQueue(device, 0, 0, &computeQueue);
     
@@ -230,14 +254,14 @@ uint8_t ComputeShaderInterface::createDescriptorSet() {
     uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
     VkDescriptorSetLayoutBinding inputLayoutBinding{};
-    inputLayoutBinding.binding = 1;
+    inputLayoutBinding.binding = 2;
     inputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     inputLayoutBinding.descriptorCount = 1;
     inputLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     inputLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
     VkDescriptorSetLayoutBinding outputLayoutBinding{};
-    outputLayoutBinding.binding = 2;
+    outputLayoutBinding.binding = 1;
     outputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     outputLayoutBinding.descriptorCount = 1;
     outputLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -259,7 +283,6 @@ uint8_t ComputeShaderInterface::createDescriptorSet() {
 }
 
 uint8_t ComputeShaderInterface::createDescriptorPool() {
-    VkDescriptorPool descriptorPool;
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = 1;
@@ -305,23 +328,77 @@ uint8_t ComputeShaderInterface::createDescriptorPool() {
 
 // Buffers
 void ComputeShaderInterface::createUniformBuffer() {
-    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, inputBuffer, inputBufferMemory);
+    genericCreateBuffer(device, physicalDevice, sizeof(UniformBlock), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
+    
+    uniformBufferInfo.buffer = uniformBuffer; // Your UBO VkBuffer
+    uniformBufferInfo.offset = 0; // Start from the beginning of the buffer
+    uniformBufferInfo.range = sizeof(UniformBlock); // The size of your UBO data
+
     
 }
 
 void ComputeShaderInterface::createInputBuffer() {
-    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, outputBuffer, outputBufferMemory);
+    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, inputBuffer, inputBufferMemory);
     
+    inputBufferInfo.buffer = inputBuffer; // Your input data VkBuffer
+    inputBufferInfo.offset = 0; // Start from the beginning of the buffer
+    inputBufferInfo.range = sizeof(Particle) * MAX_PARTICLE_COUNT; // Size of the input data
+
 }
 
 void ComputeShaderInterface::createOutputBuffer() {
-    genericCreateBuffer(device, physicalDevice, sizeof(UniformBlock), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
+    genericCreateBuffer(device, physicalDevice, sizeof(Particle) * MAX_PARTICLE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, outputBuffer, outputBufferMemory);
+    
+    outputBufferInfo.buffer = outputBuffer; // Your output data VkBuffer
+    outputBufferInfo.offset = 0; // Start from the beginning of the buffer
+    outputBufferInfo.range = sizeof(Particle) * MAX_PARTICLE_COUNT; // Size of the output data
+
+    
 }
 
 void ComputeShaderInterface::createAllBuffers() {
     createUniformBuffer();
     createInputBuffer();
     createOutputBuffer();
+}
+
+void ComputeShaderInterface::allocateDescriptorSets() {
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &descriptorSetLayout;
+
+    vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
+
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = descriptorSet;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = descriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &outputBufferInfo;
+
+    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[2].dstSet = descriptorSet;
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pBufferInfo = &inputBufferInfo;
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
 }
 
 void ComputeShaderInterface::copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt) {
@@ -417,6 +494,8 @@ void ComputeShaderInterface::genericCreateBuffer(VkDevice device, VkPhysicalDevi
     if (result != VK_SUCCESS) {
         std::cerr << "Failed to bind memory : " << result << std::endl;
     }
+    
+    std::cout << "Bound memory" << std::endl;
 }
 
 uint32_t ComputeShaderInterface::findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {

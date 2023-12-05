@@ -31,6 +31,7 @@ class ComputeShaderInterface {
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkDevice device;
+    uint32_t computeQueueFamilyIndex = -1;
     VkQueue computeQueue;
     VkShaderModule shaderModule;
     
@@ -49,11 +50,15 @@ class ComputeShaderInterface {
     // desciptor set
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorSet descriptorSet;
+    VkDescriptorPool descriptorPool;
     
     // data
     VkCommandPool commandPool;
     
     
+    VkDescriptorBufferInfo uniformBufferInfo;
+    VkDescriptorBufferInfo inputBufferInfo;
+    VkDescriptorBufferInfo outputBufferInfo;
     
 public:
     uint8_t setup();
@@ -61,6 +66,7 @@ public:
     // This is described in the order of execution.
     uint8_t setupVulkan();
     uint8_t setupDevice();
+    uint32_t setupQueueFamilyIndex();
     uint8_t setupQueue();
     uint8_t loadShader();
     uint8_t setupComputePipeline();
@@ -69,12 +75,13 @@ public:
     uint8_t createDescriptorSet();
     uint8_t createDescriptorPool();
     
-    
     void createUniformBuffer();
     void createInputBuffer();
     void createOutputBuffer();
     
     void createAllBuffers();
+    
+    void allocateDescriptorSets();
     
     // Data phase
     void copyToBuffer(std::array<Particle, MAX_PARTICLE_COUNT> particles, float dt);
